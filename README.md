@@ -79,6 +79,8 @@ Documentação desenvolvida para fins acadêmicos - IFPB.
 
 ---
 
+### 1. Preparação do Ambiente (Docker)
+
 ## ⚙️ Execução e Testes de Carga
 
 Após a instalação, siga estes procedimentos para subir a infraestrutura e realizar as validações de desempenho.
