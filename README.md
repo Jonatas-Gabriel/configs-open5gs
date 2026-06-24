@@ -76,10 +76,12 @@ Simulação RAN: UERANSIM
 Redes: Protocolo SCTP, Túneis TUN/TAP
 
 Documentação desenvolvida para fins acadêmicos - IFPB.
-
+```
 ---
 
 ### 1. Preparação do Ambiente (Docker)
+
+---
 
 ## ⚙️ Execução e Testes de Carga
 
@@ -87,6 +89,8 @@ Após a instalação, siga estes procedimentos para subir a infraestrutura e rea
 
 ### 1. Inicialização do Ambiente
 Suba os serviços do 5G Core e a simulação de rádio (gNB e UE):
+
+---
 
 ```bash
 sudo docker compose -f sa-deploy.yaml up -d
