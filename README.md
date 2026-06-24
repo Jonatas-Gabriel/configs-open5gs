@@ -1,100 +1,81 @@
-Passo a passo para instalar o lxc, criar os containers já com o ubuntu instalado e verificar se os containers foram instalados:
-Neste caso, cada container deve ser criado em máquinas virtuais diferentes a fim de validar os teste.
+# Laboratório 5G Core com Open5GS e UERANSIM
 
-1- Instala o lxc:
-sudo snap install lxd 
+Projeto acadêmico focado na implementação e validação de uma rede 5G Core virtualizada utilizando containers **LXC**, **Open5GS** para o núcleo da rede (5GC) e **UERANSIM** para simulação da RAN (Radio Access Network).
 
-2- Verifica se o lxc está instalado corretamente:
+---
+
+## 📋 Arquitetura do Lab
+Este laboratório simula um ambiente real de telecomunicações, onde a separação entre o núcleo (Core) e a RAN é mantida em containers isolados:
+* **Container `open5gs-core`**: Responsável pela sinalização e processamento do core (AMF, UPF, SMF, etc).
+* **Container `ueransim-ran`**: Simula a estação rádio base (gNB) e o Equipamento de Usuário (UE).
+
+## 🚀 Guia de Implementação
+
+### 1. Preparação do Ambiente (LXC/LXD)
+Instale e inicialize o gerenciador de containers:
+```bash
+sudo snap install lxd
+sudo lxd init
 lxc --version
 
-3- Inicializa os dois containers com o ubuntu instalado:
+2. Provisionamento dos Containers
+Crie os nós isolados para a topologia:
+
 lxc launch images:ubuntu/22.04 open5gs-core
 lxc launch images:ubuntu/22.04 ueransim-ran
-sudo lxd init
-
-4- Lista oc containers criados:
 lxc list
 
-5- Entrar nos containers e instalar os ambientes do open5gs e ueransim:
-5.1 - Instalar o open5gs no container do open5gs-core:
-sudo lxc exec open5gs-core -- bash
+3. Configuração do Core (Open5GS)
+Dentro do container open5gs-core:
 
+sudo lxc exec open5gs-core -- bash
+# Instalação dos pacotes
 apt update && apt install software-properties-common -y
 add-apt-repository ppa:open5gs/latest -y
-apt update
-apt install open5gs -y
+apt update && apt install open5gs -y
 
-5.2 - Instalar o ueransim-ran no container ueransim-ran:
+4. Configuração da RAN (UERANSIM)
+Dentro do container ueransim-ran:
+
 sudo lxc exec ueransim-ran -- bash
+# Dependências necessárias
+apt install -y git make gcc g++ cmake libsctp-dev lksctp-tools iproute2 net-tools curl
 
-Instala as dependencias: 
-apt install -y \
-git \
-make \
-gcc \
-g++ \
-cmake \
-libsctp-dev \
-lksctp-tools \
-iproute2 \
-net-tools \
-curl
-
-clona o repositório:
-git clone https://github.com/aligungr/UERANSIM.git
-
-Entra no diretório do UERAMSIM:
+# Compilação
+git clone [https://github.com/aligungr/UERANSIM.git](https://github.com/aligungr/UERANSIM.git)
 cd UERANSIM
-
-Dentro do repositório:
 make
 
-Verificar os arquivos contruídos ao final do comando make:
-ls build/
+🧪 Procedimentos de Validação e Testes
+O sucesso da implementação é verificado através de testes de vazão (throughput) e latência.
 
-Após isso, subir o ip 10.45.0.1 (ogstun) na interface ogstun e 10.108.79.151 na eth0 (eth0) par criar o tunel no container do opne5gs.
-No Container do UERAMSIN, setar o ip 10.108.79.66 (eth0) na interface eth0 para dar inicio aos testes.
+1. Teste de Vazão (Throughput)
+Utilizamos o iPerf3 para medir a capacidade do switch virtual (lxdbr0) entre os containers.
 
-Testes no LXC:
-
-No Core
-
-systemctl restart open5gs-amfd open5gs-upfd (Reiniciar os serviços da amf e upf)
-
-Passo 1: Ligar o Servidor de Destino (No container open5gs-core)
-Aceda ao terminal do container do Core e inicie o receptor de tráfego do iPerf3:
-
-1. Fatia eMBB (Throughput / Vazão)
-Como o iPerf3 dá erro ao tentar alcançar a rede de dados tunelada externa (10.45.0.1), vamos realizar o teste de vazão apontando diretamente para o IP do container do Core na rede local do LXC (10.62.119.151). Isso mede a capacidade máxima de vazão de pacotes entre os containers através do switch virtual (lxdbr0).
-
-Preparação (No Container open5gs-core)
-Inicie o servidor iPerf3 em modo TCP:
+No open5gs-core (Servidor):
 
 iperf3 -s -p 5201
 
-No Container ueransim-ran
+No ueransim-ran (Cliente):
 
-iperf3 -c 10.62.119.151 -t 60 -P 4 - Dispara um teste simulando quatro conexões ao mesmo tempo para estressar e testar a vazão / Throughput.
+iperf3 -c <IP_DO_CORE> -t 60 -P 4
 
-2. Fatia URLLC (Latência e Jitter)
-Para a latência e o jitter, o protocolo ICMP (ping) é o mais indicado em ambientes virtuais porque ele opera diretamente na camada de rede (Camada 3), ignorando as travas de descritores de sockets que afetam o iPerf3.
+2. Teste de Latência (URLLC)
+A latência é medida via ICMP diretamente no túnel de dados do UE (uesimtun0).
 
-Teste de Latência RTT e Estabilidade (No Container ueransim-ran)
-Como o celular virtual do UERANSIM está autenticado e conectado (CM-CONNECTED), a interface uesimtun0 está criada. Vamos forçar o envio de 100 pacotes em direção ao IP interno do gNB ou do Core para capturar a latência do túnel:
+# Executar no container ueransim-ran
+ping -I uesimtun0 -c 100 <IP_DESTINO>
 
-ping -I uesimtun0 -c 100 10.62.119.151
+🛠️ Tecnologias Utilizadas
+Virtualização: LXC/LXD
 
-Passo 2: Ativar as Regras de Encaminhamento no Kernel (No container open5gs-core)
-O UPF precisa de permissão no kernel do container para rotear pacotes da rede virtual 5G para o mundo externo:
+Core 5G: Open5GS
 
-Bash
-sysctl -w net.ipv4.ip_forward=1
+Simulação RAN: UERANSIM
 
-3. Jitter e Perda UDP (URLLC):
+Redes: Protocolo SCTP, Túneis TUN/TAP
 
-Bash
-iperf3 -c 10.62.119.151 -u -b 50M -t 60
-
+Documentação desenvolvida para fins acadêmicos - IFPB.
 
 
 
